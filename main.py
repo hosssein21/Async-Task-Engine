@@ -1,47 +1,56 @@
 
-from task_engine.models import Job, TaskType, JobPriority
-from task_engine.scheduler import JobScheduler
+from task_engine.engine import SequentialEngine
+from task_engine.models import Job, JobPriority, TaskType
+
+from tasks.cpu_tasks import calculate_statistics
+from tasks.io_tasks import generate_report
+from tasks.async_tasks import check_service
 
 
 def main() -> None:
-    scheduler = JobScheduler()
+    engine = SequentialEngine()
 
-    jobs = [
+    engine.register_handler(TaskType.CPU, calculate_statistics)
+    engine.register_handler(TaskType.IO, generate_report)
+    engine.register_handler(TaskType.ASYNC, check_service)
+
+    engine.submit(
         Job(
-            name="Generate report",
+            name="Generate monthly report",
             task_type=TaskType.IO,
+            payload={"report_name": "monthly"},
             priority=JobPriority.NORMAL,
-        ),
+        )
+    )
+
+    engine.submit(
         Job(
-            name="Process dataset",
+            name="Calculate dataset statistics",
             task_type=TaskType.CPU,
-            priority=JobPriority.LOW,
-        ),
+            payload={"numbers": [10, 20, 30, 40, 50]},
+            priority=JobPriority.HIGH,
+        )
+    )
+
+    engine.submit(
         Job(
-            name="Send alert",
+            name="Check payment service",
             task_type=TaskType.ASYNC,
-            priority=JobPriority.HIGH,
-        ),
-        Job(
-            name="Check service",
-            task_type=TaskType.IO,
-            priority=JobPriority.HIGH,
-        ),
-    ]
+            payload={"service_name": "payment-service"},
+            priority=JobPriority.LOW,
+        )
+    )
 
-    for job in jobs:
-        scheduler.submit(job)
+    results = engine.run_all()
 
-    print(f"Jobs waiting: {scheduler.size()}")
-    print(f"Next job: {scheduler.peek().name}")
+    for job in results:
+        print(f"\nJob: {job.name}")
+        print(f"Status: {job.status.value}")
 
-    print("\nExecution order:")
-
-    while not scheduler.is_empty():
-        job = scheduler.get_next()
-        print(f"{job.priority.name}: {job.name}")
-
-    print(f"\nJobs waiting: {scheduler.size()}")
+        if job.status == job.status.COMPLETED:
+            print(f"Result: {job.result}")
+        else:
+            print(f"Error: {job.error}")
 
 
 if __name__ == "__main__":
