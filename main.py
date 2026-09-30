@@ -1,30 +1,47 @@
 
 from task_engine.models import Job, TaskType, JobPriority
+from task_engine.scheduler import JobScheduler
 
 
 def main() -> None:
-    job = Job(
-        name="Calculate dataset statistics",
-        task_type=TaskType.CPU,
-        payload={"numbers": [10, 20, 30, 40, 50]},
-        priority=JobPriority.HIGH,
-    )
+    scheduler = JobScheduler()
 
-    print(f"ID: {job.id}")
-    print(f"Name: {job.name}")
-    print(f"Status: {job.status.value}")
+    jobs = [
+        Job(
+            name="Generate report",
+            task_type=TaskType.IO,
+            priority=JobPriority.NORMAL,
+        ),
+        Job(
+            name="Process dataset",
+            task_type=TaskType.CPU,
+            priority=JobPriority.LOW,
+        ),
+        Job(
+            name="Send alert",
+            task_type=TaskType.ASYNC,
+            priority=JobPriority.HIGH,
+        ),
+        Job(
+            name="Check service",
+            task_type=TaskType.IO,
+            priority=JobPriority.HIGH,
+        ),
+    ]
 
-    job.start()
-    print(f"After starting: {job.status.value}")
+    for job in jobs:
+        scheduler.submit(job)
 
-    result = {"average": 30}
-    job.complete(result)
+    print(f"Jobs waiting: {scheduler.size()}")
+    print(f"Next job: {scheduler.peek().name}")
 
-    print(f"After completion: {job.status.value}")
-    print(f"Result: {job.result}")
-    print(f"Created at: {job.created_at}")
-    print(f"Started at: {job.started_at}")
-    print(f"Finished at: {job.finished_at}")
+    print("\nExecution order:")
+
+    while not scheduler.is_empty():
+        job = scheduler.get_next()
+        print(f"{job.priority.name}: {job.name}")
+
+    print(f"\nJobs waiting: {scheduler.size()}")
 
 
 if __name__ == "__main__":
